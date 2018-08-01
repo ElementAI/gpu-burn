@@ -598,17 +598,21 @@ int main(int argc, char **argv) {
 	int runLength = 10;
 	bool useDoubles = false;
 	int thisParam = 0;
+
 	if (argc >= 2 && std::string(argv[1]) == "-d") {
-			useDoubles = true;
-			thisParam++;
+        printf("using double precision\n");
+        useDoubles = true;
+        thisParam++;
 		}
+
 	if (argc-thisParam < 2)
 		printf("Run length not specified in the command line.  Burning for 10 secs\n");
 	else 
 		runLength = atoi(argv[1+thisParam]);
 
 	if (useDoubles)
-		launch<double>(runLength, useDoubles);
+	    launch<double>(runLength, useDoubles);
+
 	else
 		launch<float>(runLength, useDoubles);
 
