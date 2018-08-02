@@ -294,23 +294,39 @@ template<class T> void startBurn(int index, int writeFd, T *A, T *B, bool double
             /*errors += our->getErrors();
             iters++;*/
             int ops = our->getIters();
-            write(writeFd, &ops, sizeof(int));
+            ssize_t w;
+            w = write(writeFd, &ops, sizeof(int));
+            if (w == -1)
+                throw std::string("Error: write function failed");
+
             ops = our->getErrors();
-            write(writeFd, &ops, sizeof(int));
+            w = write(writeFd, &ops, sizeof(int));
+            if (w == -1)
+                throw std::string("Error: write function failed");
         }
     } catch (std::string e) {
         fprintf(stderr, "Failure during compute: %s\n", e.c_str());
         int ops = -1;
         // Signalling that we failed
-        write(writeFd, &ops, sizeof(int));
-        write(writeFd, &ops, sizeof(int));
+        ssize_t w;
+        w = write(writeFd, &ops, sizeof(int));
+        if (w == -1)
+            throw std::string("Error: write function failed");
+
+        w = write(writeFd, &ops, sizeof(int));
+        if (w == -1)
+            throw std::string("Error: write function failed");
+
+
         exit(111);
     }
 }
 
 int pollTemp(pid_t *p) {
     int tempPipe[2];
-    pipe(tempPipe);
+    int rp = pipe(tempPipe);
+    if (rp == -1)
+        throw std::string("Error: pipe function failed");
 
     pid_t myPid = fork();
 
@@ -336,7 +352,10 @@ void updateTemps(int handle, std::vector<int> *temps) {
 
     int curPos = 0;
     do {
-        read(handle, data+curPos, sizeof(char));
+        ssize_t r = read(handle, data+curPos, sizeof(char));
+        if (r == -1)
+            throw std::string("Error: read function returned and error");
+
     } while (data[curPos++] != '\n');
 
     data[curPos-1] = 0;
@@ -403,9 +422,15 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
             if (FD_ISSET(clientFd.at(i), &waitHandles)) {
                 // First, reading processed
                 int processed, errors;
-                read(clientFd.at(i), &processed, sizeof(int));
+                ssize_t r;
+                r = read(clientFd.at(i), &processed, sizeof(int));
+                if (r == -1)
+                    throw std::string("Error: read function failed");
+
                 // Then errors
-                read(clientFd.at(i), &errors, sizeof(int));
+                r = read(clientFd.at(i), &errors, sizeof(int));
+                if (r == -1)
+                    throw std::string("Error: read function failed");
 
                 clientErrors.at(i) += errors;
                 if (processed == -1)
@@ -439,7 +464,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
 
             printf("\ndevice :  ");
             for (size_t i = 0; i < clientPid.size(); ++i)
-                printf("GPU %i\t  ", i);
+                printf("GPU %zd\t  ", i);
 
             printf("\nmatrix/s: ");
             for (size_t i = 0; i < clientCalcs.size(); ++i) {
@@ -493,9 +518,9 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
                 nextReport = elapsed + 10.0f;
                 printf("\nSummary at:   ");
                 fflush(stdout);
-                system("date"); // Printing a date
+                int s = system("date"); // Printing a date
                 fflush(stdout);
-                printf("\n\n");
+                // printf("\n");
                 //printf("\t(checkpoint)\n");
                 for (size_t i = 0; i < clientErrors.size(); ++i) {
                     if (clientErrors.at(i))
@@ -538,7 +563,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
 }
 
 template<class T> void launch(int runLength, bool useDoubles) {
-    system("nvidia-smi -L");
+    int  s = system("nvidia-smi -L");
 
     // Initting A and B with random data
     T *A = (T*) malloc(sizeof(T)*SIZE*SIZE);
@@ -552,7 +577,9 @@ template<class T> void launch(int runLength, bool useDoubles) {
     // Forking a process..  This one checks the number of devices to use,
     // returns the value, and continues to use the first one.
     int mainPipe[2];
-    pipe(mainPipe);
+    int p = pipe(mainPipe);
+    if (p == -1)
+        throw std::string("Error: pipe function failed");
     int readMain = mainPipe[0];
     std::vector<int> clientPipes;
     std::vector<pid_t> clientPids;
@@ -564,7 +591,9 @@ template<class T> void launch(int runLength, bool useDoubles) {
         close(mainPipe[0]);
         int writeFd = mainPipe[1];
         int devCount = initCuda();
-        write(writeFd, &devCount, sizeof(int));
+        ssize_t w = write(writeFd, &devCount, sizeof(int));
+        if (w == -1)
+            throw std::string("Error: write function failed");
 
         startBurn<T>(0, writeFd, A, B, useDoubles);
 
@@ -575,7 +604,9 @@ template<class T> void launch(int runLength, bool useDoubles) {
 
         close(mainPipe[1]);
         int devCount;
-        read(readMain, &devCount, sizeof(int));
+        ssize_t r = read(readMain, &devCount, sizeof(int));
+        if (r == -1)
+            throw std::string("Error: read function failed");
 
         if (!devCount) {
             fprintf(stderr, "No CUDA devices\n");
@@ -583,7 +614,10 @@ template<class T> void launch(int runLength, bool useDoubles) {
 
             for (int i = 1; i < devCount; ++i) {
                 int slavePipe[2];
-                pipe(slavePipe);
+                int p = pipe(slavePipe);
+                if (p == -1)
+                    throw std::string("Error: pipe function failed");
+
                 clientPipes.push_back(slavePipe[0]);
 
                 pid_t slavePid = fork();
