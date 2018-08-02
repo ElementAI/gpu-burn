@@ -385,6 +385,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
         clientUpdateTime.push_back(thisTime);
     }
 
+
     time_t startTime = time(0);
     int changeCount;
     float nextReport = 10.0f;
@@ -434,7 +435,11 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
         // Printing progress (if a child has initted already)
         if (childReport) {
             float elapsed = fminf((float)(time(0)-startTime)/(float)runTime*100.0f, 100.0f);
-            printf("\n\r%.1f%%  ", elapsed);
+            printf("\n\n\r%.1f%%  ", elapsed);
+
+            printf("\ndevice :  ");
+            for (size_t i = 0; i < clientPid.size(); ++i)
+                printf("GPU %i\t  ", i);
 
             printf("\nmatrix/s: ");
             for (size_t i = 0; i < clientCalcs.size(); ++i) {
@@ -445,12 +450,12 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
                     printf("%.2fK", clientProcessed.at(i)/(double)1000);
                 }
                 else
-                    printf("%f", clientProcessed.at(i));
+                    printf("%.2f", clientProcessed.at(i));
                 if (i != clientCalcs.size() - 1)
-                    printf("/");
+                    printf("\t  ");
             }
 
-            printf("\nproc: ");
+            printf("\nproc:     ");
             for (size_t i = 0; i < clientCalcs.size(); ++i) {
                 if (clientCalcs.at(i) > 1000000 ) {
                     printf("%.2fM", (float)clientCalcs.at(i)/(float)1000000);
@@ -461,9 +466,9 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
                 else
                     printf("%d", clientCalcs.at(i));
                 if (i != clientCalcs.size() - 1)
-                    printf("/");
+                    printf("\t  ");
             }
-            printf("\nerr: ");
+            printf("\nerr:      ");
             for (size_t i = 0; i < clientErrors.size(); ++i) {
                 std::string note = "%d";
                 if (clientCalcs.at(i) == -1)
@@ -473,13 +478,13 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
 
                 printf(note.c_str(), clientErrors.at(i));
                 if (i != clientCalcs.size() - 1)
-                    printf("/");
+                    printf("\t  ");
             }
-            printf("\ntemp: ");
+            printf("\ntemp:     ");
             for (size_t i = 0; i < clientTemp.size(); ++i) {
                 printf(clientTemp.at(i) != 0 ? "%dC" : "-- ", clientTemp.at(i));
                 if (i != clientCalcs.size() - 1)
-                    printf("/");
+                    printf("\t  ");
             }
 
             fflush(stdout);
@@ -517,7 +522,8 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
     printf("\nKilling processes.. ");
     fflush(stdout);
     for (size_t i = 0; i < clientPid.size(); ++i)
-        kill(clientPid.at(i), 15);
+#define SIZE 1024ul // Matrices are SIZE*SIZE.
+            kill(clientPid.at(i), 15);
 
     kill(tempPid, 15);
     close(tempHandle);
@@ -525,6 +531,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
     while (wait(NULL) != -1);
     printf("done\n");
 
+#define SIZE 1024ul // Matrices are SIZE*SIZE.
     printf("\nTested %d GPUs:\n", (int)clientPid.size());
     for (size_t i = 0; i < clientPid.size(); ++i)
         printf("\tGPU %d: %s\n", (int)i, clientFaulty.at(i) ? "FAULTY" : "OK");
