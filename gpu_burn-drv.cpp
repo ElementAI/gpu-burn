@@ -160,7 +160,7 @@ public:
         size_t useBytes = (size_t)((double)availMemory()*USEMEM);
         printf("Initialized device %d with %lu MB of memory (%lu MB available, using %lu MB of it), %s\n",
                d_devNumber, totalMemory()/1024ul/1024ul, availMemory()/1024ul/1024ul, useBytes/1024ul/1024ul,
-               d_doubles ? "using DOUBLES" : "using FLOATS");
+               d_doubles ? "using DOUBLES (FP64)" : "using FLOATS (FP32)");
         size_t d_resultSize = sizeof(T)*SIZE*SIZE;
         d_iters = (useBytes - 2*d_resultSize)/d_resultSize; // We remove A and B sizes
         //printf("Results are %d bytes each, thus performing %d iterations\n", d_resultSize, d_iters);
@@ -406,6 +406,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
 
 
     time_t startTime = time(0);
+    time_t now;
     int changeCount;
     float nextReport = 10.0f;
     bool childReport = false;
@@ -459,14 +460,17 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
 
         // Printing progress (if a child has initted already)
         if (childReport) {
-            float elapsed = fminf((float)(time(0)-startTime)/(float)runTime*100.0f, 100.0f);
-            printf("\n\n\r%.1f%%  ", elapsed);
 
-            printf("\ndevice :  ");
+            float elapsed = fminf((float)(time(0)-startTime)/(float)runTime*100.0f, 100.0f);
+            printf("\n\n\rProgress: \t%.1f%%", elapsed);
+            time(&now);
+            printf("\nTime:     \t%s", ctime(&now));
+
+            printf("Device :  \t");
             for (size_t i = 0; i < clientPid.size(); ++i)
                 printf("GPU %zd\t  ", i);
 
-            printf("\nmatrix/s: ");
+            printf("\nMatrix/s: \t");
             for (size_t i = 0; i < clientCalcs.size(); ++i) {
                 if (clientCalcs.at(i) > 1000000 ) {
                     printf("%.2fM", clientProcessed.at(i)/(double)1000000);
@@ -480,7 +484,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
                     printf("\t  ");
             }
 
-            printf("\nproc:     ");
+            printf("\nProcessed:\t");
             for (size_t i = 0; i < clientCalcs.size(); ++i) {
                 if (clientCalcs.at(i) > 1000000 ) {
                     printf("%.2fM", (float)clientCalcs.at(i)/(float)1000000);
@@ -493,7 +497,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
                 if (i != clientCalcs.size() - 1)
                     printf("\t  ");
             }
-            printf("\nerr:      ");
+            printf("\nErrors:   \t");
             for (size_t i = 0; i < clientErrors.size(); ++i) {
                 std::string note = "%d";
                 if (clientCalcs.at(i) == -1)
@@ -505,7 +509,7 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
                 if (i != clientCalcs.size() - 1)
                     printf("\t  ");
             }
-            printf("\ntemp:     ");
+            printf("\nTemp:     \t");
             for (size_t i = 0; i < clientTemp.size(); ++i) {
                 printf(clientTemp.at(i) != 0 ? "%dC" : "-- ", clientTemp.at(i));
                 if (i != clientCalcs.size() - 1)
@@ -514,20 +518,6 @@ void listenClients(std::vector<int> clientFd, std::vector<pid_t> clientPid, int 
 
             fflush(stdout);
 
-            if (nextReport < elapsed) {
-                nextReport = elapsed + 10.0f;
-                printf("\nSummary at:   ");
-                fflush(stdout);
-                int s = system("date"); // Printing a date
-                fflush(stdout);
-                // printf("\n");
-                //printf("\t(checkpoint)\n");
-                for (size_t i = 0; i < clientErrors.size(); ++i) {
-                    if (clientErrors.at(i))
-                        clientFaulty.at(i) = true;
-                    clientErrors.at(i) = 0;
-                }
-            }
         }
 
         // Checking whether all clients are dead
@@ -651,14 +641,31 @@ int main(int argc, char **argv) {
     int runLength = 10;
     bool useDoubles = false;
     int thisParam = 0;
-    if (argc >= 2 && std::string(argv[1]) == "-d") {
-        useDoubles = true;
-        thisParam++;
+    // NEED TO BE FIXED
+    if (argc >= 2) {
+        if (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help") {
+            printf("gpu_burn \nusage: ./gpu_burn [options] [burning time]");
+            printf("\n\n options:\n\t-d, --fp64\t use matrix of double(fp64)");
+            printf("\n\t-f, --fp32\t use matrices of float (fp32) [DEFAULT]");
+            printf("\n\n burning time: \n\t 10[DEFAULT]\t stress test duration in seconds\n\n\n");
+            exit(0);
+        }
+        else if (std::string(argv[1]) == "-d" || std::string(argv[1]) == "--fp64") {
+            useDoubles = true;
+            thisParam++;
+        }
+        else if (std::string(argv[1]) == "-f" || std::string(argv[1]) == "--fp32") {
+            useDoubles = false;
+            thisParam++;
+        }
     }
+
     if (argc-thisParam < 2)
         printf("Run length not specified in the command line.  Burning for 10 secs\n");
     else
         runLength = atoi(argv[1+thisParam]);
+
+
 
     if (useDoubles)
         launch<double>(runLength, useDoubles);
