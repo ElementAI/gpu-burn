@@ -186,6 +186,7 @@ public:
 
         for (size_t i = 0; i < d_iters; ++i) {
             if (d_doubles)
+                // Matrices multiplication for double (FP64)
                 checkError(cublasDgemm(d_cublas, CUBLAS_OP_N, CUBLAS_OP_N,
                                        SIZE, SIZE, SIZE, &alphaD,
                                        (const double*)d_Adata, SIZE,
@@ -193,6 +194,7 @@ public:
                                        &betaD,
                                        (double*)d_Cdata + i*SIZE*SIZE, SIZE), "DGEMM");
             else
+                // Matrices multiplication for float (FP32)
                 checkError(cublasSgemm(d_cublas, CUBLAS_OP_N, CUBLAS_OP_N,
                                        SIZE, SIZE, SIZE, &alpha,
                                        (const float*)d_Adata, SIZE,
